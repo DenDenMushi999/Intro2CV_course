@@ -5,7 +5,7 @@ import cv2
 import numpy as np
 from scipy.spatial.distance import cdist
 
-from ticket_to_ride import predict_image
+# from ticket_to_ride import predict_image
 
 
 COLORS = ('blue', 'green', 'black', 'yellow', 'red')
