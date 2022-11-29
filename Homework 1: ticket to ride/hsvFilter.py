@@ -19,6 +19,8 @@ cv2.namedWindow("Range HSV")
 cv2.resizeWindow("Range HSV", 800,500)
 cv2.createTrackbar("HUE Min", "Range HSV", 0, 180, empty)
 cv2.createTrackbar("HUE Max", "Range HSV", 180, 180, empty)
+cv2.createTrackbar("HUE Min2", "Range HSV", 0, 180, empty)
+cv2.createTrackbar("HUE Max2", "Range HSV", 180, 180, empty)
 cv2.createTrackbar("SAT Min", "Range HSV", 0, 255, empty)
 cv2.createTrackbar("SAT Max", "Range HSV", 255, 255, empty)
 cv2.createTrackbar("VAL Min", "Range HSV", 0, 255, empty)
@@ -58,6 +60,8 @@ def filter(img, gain, case = 1):
 while True:
     h_min = cv2.getTrackbarPos("HUE Min", "Range HSV")
     h_max = cv2.getTrackbarPos("HUE Max", "Range HSV")
+    h_min2 = cv2.getTrackbarPos("HUE Min2", "Range HSV")
+    h_max2 = cv2.getTrackbarPos("HUE Max2", "Range HSV")
     s_min = cv2.getTrackbarPos("SAT Min", "Range HSV")
     s_max = cv2.getTrackbarPos("SAT Max", "Range HSV")
     v_min = cv2.getTrackbarPos("VAL Min", "Range HSV")
@@ -79,6 +83,8 @@ while True:
     
     lower_range = np.array([h_min, s_min, v_min])
     upper_range = np.array([h_max, s_max, v_max])
+    lower_range2 = np.array([h_min2, s_min, v_min])
+    upper_range2 = np.array([h_max2, s_max, v_max])
 
     gray_low = np.array([h_min])
     gray_max = np.array([h_max])
@@ -89,6 +95,8 @@ while True:
     # img = cv2.resize(img, (800, 600))
     # mask = cv2.inRange(filter(img.copy(),blur_, 2), gray_low, gray_max)
     mask = cv2.inRange(filter(hsv.copy(),blur_, 2), lower_range, upper_range)
+    mask2 = cv2.inRange(filter(hsv.copy(),blur_, 2), lower_range2, upper_range2)
+    mask = cv2.bitwise_or(mask, mask2)
     # mask = cv2.inRange(hsv.copy(), lower_range, upper_range)
    
    
