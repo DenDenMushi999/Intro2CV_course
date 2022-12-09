@@ -12,7 +12,7 @@ from skimage.measure import label
 
 # from dpipe.im.metrics import iou
 
-from sudoku import predict_image
+from sudoku_final import predict_image
 
 
 # ################################################## Utils ############################################################

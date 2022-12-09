@@ -1,15 +1,28 @@
+import joblib
 import random
+import re
+from pathlib import Path
+import glob
 
 import numpy as np
+from numpy import logical_and as land
+from numpy import logical_not as lnot
 import cv2 as cv
 import torch
 
+ 
 random.seed(0)
 np.random.seed(0)
 torch.manual_seed(0)
 torch.cuda.manual_seed(0)
 torch.backends.cudnn.deterministic = True
 from torchvision import transforms
+
+PROJ_PATH = Path('/home/dendenmushi/projects/Intro2CV_course/Homework_2')
+IMAGES_PATH = PROJ_PATH/'images'
+TRAIN_PATH = PROJ_PATH/'train'
+TRAIN_IMG_NAMES = glob.glob(str(TRAIN_PATH/'*.jpg'))
+TRAIN_IMG_NAMES.sort(key = lambda x: re.findall('\d+', x)[-1])
 
 SCALE = 0.33
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
@@ -60,9 +73,9 @@ class LeNet5(torch.nn.Module):
 
 model = LeNet5()
 model = model.to(device)
-model.load_state_dict(torch.load('/autograder/submission/mnist_net.pt', map_location=torch.device('cpu')))
+model.load_state_dict(torch.load('mnist_net.pt', map_location=torch.device('cpu')))
 
-def find_puzzle_mask( image: np.ndarray ):
+def find_puzzle_mask( image: np.ndarray, debug: bool = False ):
 	area_thr = 700*700
 	rect_ratio_thresh = 0.7
 	puzzle_areas_ratio_min = 0.7
@@ -79,11 +92,26 @@ def find_puzzle_mask( image: np.ndarray ):
 	# To eliminate several contours in thick sudoku borders
 	dilate_kernel = np.ones((3,3))
 	dilate_iters = 5
+	# thresh = cv.morphologyEx(thresh, cv.MORPH_DILATE, dilate_kernel, iterations=dilate_iters, borderType=cv.BORDER_CONSTANT)
+
+	if debug:
+		cv.namedWindow("Puzzle_Thresh", cv.WINDOW_NORMAL)
+		cv.resizeWindow("Puzzle_Thresh", 600, 400)
+		cv.imshow("Puzzle_Thresh", thresh)
 	cnts, hierarchy = cv.findContours(thresh.copy(), cv.RETR_EXTERNAL,
 		cv.CHAIN_APPROX_SIMPLE)
 	
 	cnts, hierarchy = zip(*((c, h) for c,h in zip(cnts,hierarchy[0]) if cv.contourArea(c) > area_thr))
 	hierarchy = [hierarchy]
+
+	if debug:
+		det_cnts_img = img.copy()
+		hulls = [cv.convexHull(c) for c in cnts]
+		det_cnts_img = cv.drawContours(det_cnts_img, hulls, -1, color=(0,150,255), thickness=3)
+		det_cnts_img = cv.drawContours(det_cnts_img, cnts, -1, color=(0,255,255), thickness=3)
+		cv.namedWindow("detected_contours", cv.WINDOW_NORMAL)
+		cv.resizeWindow("detected_contours", 600, 400)		
+		cv.imshow("detected_contours", det_cnts_img)
 
 	# cnts_imu = imutils.grab_contours(cnts)
 	cnts_imu = sorted(cnts, key=cv.contourArea, reverse=True)
@@ -109,17 +137,64 @@ def find_puzzle_mask( image: np.ndarray ):
 
 		puzzle_cnts.append(approx)
 
+	if debug:
+		if len(puzzle_cnts) > 0:
+			output = image.copy()
+			cv.namedWindow("puzzle_outline", cv.WINDOW_NORMAL)
+			cv.resizeWindow("puzzle_outline", 600, 400)
+			cv.drawContours(output, puzzle_cnts, -1, (0, 255, 0), 2)
+			cv.imshow("puzzle_outline", output)
+		else:
+			print('I have not found puzzle contour!')
+
 	if len(puzzle_cnts) == 0 :
 		return puzzle_mask, puzzle_cnts
 
 	puzzle_mask = np.zeros_like(thresh)
 	puzzle_mask = cv.fillPoly(puzzle_mask, puzzle_cnts, 255)
+		
 
+	# puzzle = four_point_transform(image, puzzle_cnts.reshape(4, 2))
+	# warped = four_point_transform(gray, puzzle_cnts.reshape(4, 2))
+
+	if debug:
+		cv.namedWindow("puzzle_mask", cv.WINDOW_NORMAL)
+		cv.resizeWindow("puzzle_mask", 600, 400)
+		cv.imshow("puzzle_mask", puzzle_mask/255)
 	# return a 2-tuple of puzzle in both RGB and grayscale
 	return puzzle_mask/255, puzzle_cnts
 
 
-def warp_puzzles( puzzle_contours, img_orig):
+def warp_puzzles( puzzle_contours, img_orig, debug=False):
+
+	warped_imgs = []
+	
+	for c in puzzle_contours:
+		print(c)
+		if len(c) > 4:
+			rect = cv.minAreaRect(c)
+			box = cv.boxPoints(rect)
+			center, dims, angle = rect
+			width = int(max(dims))
+		else :
+			box = c
+			width = int(np.linalg.norm(box[0]-box[1]))
+		print(width)
+		dst = np.array([[0, 0],[width, 0],[width, width],[0, width]], dtype = "float32")
+		box = box.reshape((4,2)).astype(np.float32)
+
+		M = cv.getPerspectiveTransform(box, dst)
+		warped = cv.warpPerspective(img_orig, M, (width, width))
+		warped_imgs.append(warped)
+	
+	if debug:
+		cv.namedWindow("warped", cv.WINDOW_NORMAL)
+		cv.resizeWindow("warped", 600, 400)
+		cv.imshow('warped',warped_imgs[0])
+	return warped_imgs
+
+
+def warp_puzzles_old( puzzle_contours, img_orig, debug=False):
 
 	warped_imgs = []
 	
@@ -154,15 +229,20 @@ def warp_puzzles( puzzle_contours, img_orig):
 		warped = cv.warpPerspective(img_orig, M, (max_width, maxHeight))
 		warped_imgs.append(warped)
 	
+	if debug:
+		cv.namedWindow("warped", cv.WINDOW_NORMAL)
+		cv.resizeWindow("warped", 600, 400)
+		cv.imshow('warped',warped_imgs[0])
 	return warped_imgs
 
 
-def find_puzzle( img ):
-	puzzle_mask, puzzle_cnts = find_puzzle_mask(img)
-	return puzzle_mask, warp_puzzles( puzzle_cnts, img)
+def find_puzzle( img, debug=False ):
+	puzzle_mask, puzzle_cnts = find_puzzle_mask(img, debug)
+	# return puzzle_mask, warp_puzzles_old( puzzle_cnts, img, debug=True)
+	return puzzle_mask, warp_puzzles_old( puzzle_cnts, img, debug=True)
 	
 
-def find_cells(img):
+def find_cells(img, debug=False):
     """
     Find the cells of a sudoku grid
     """
@@ -207,7 +287,7 @@ def find_cells(img):
     return cells
 
 
-def find_cells_manual( warped_gray ):
+def find_cells_manual( warped_gray, debug=False ):
 	assert len(warped_gray.shape) == 2
 
 	h,w = warped_gray.shape
@@ -265,3 +345,24 @@ def predict_image(image: np.ndarray) -> (np.ndarray, list):
 		digit_cells, pred_vals = find_cells_digits(puzzle_cells)
 		sudoku_digits.append(digit_cells)
 	return mask, sudoku_digits
+	
+
+if __name__ == '__main__':
+	
+	img = cv.imread(TRAIN_IMG_NAMES[0])
+	mask, sudoku_digits = predict_image(img)
+	
+	cv.namedWindow("puzzle_mask", cv.WINDOW_NORMAL)
+	cv.resizeWindow("puzzle_mask", 600, 400)
+	cv.imshow('puzzle_mask',mask)
+
+	cv.namedWindow("img", cv.WINDOW_NORMAL)
+	cv.resizeWindow("img", 600, 400)
+	cv.imshow('img',img)
+	print(mask)
+	print(mask.max(), mask.min())
+	while True:
+		key = cv.waitKey(1) & 0xFF
+		if key == ord('q'):
+			break
+	cv.destroyAllWindows()

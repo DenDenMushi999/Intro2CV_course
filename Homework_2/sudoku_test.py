@@ -74,7 +74,7 @@ def find_puzzle_mask( image: np.ndarray, debug: bool = False ):
 		peri = cv.arcLength(c, True)
 		hull = cv.convexHull(c)
 		approx = cv.approxPolyDP(hull, 0.02 * peri, closed=True)
-		if len(approx) > 20:
+		if len(approx) > 8:
 			continue	
 		
 		rect = cv.minAreaRect(c)
@@ -99,7 +99,6 @@ def find_puzzle_mask( image: np.ndarray, debug: bool = False ):
 	if len(puzzle_cnts) == 0 :
 		return puzzle_mask, puzzle_cnts
 
-	print(len(puzzle_cnts))
 	puzzle_mask = np.zeros_like(thresh)
 	puzzle_mask = cv.fillPoly(puzzle_mask, puzzle_cnts, 255)
 		
@@ -115,6 +114,33 @@ def find_puzzle_mask( image: np.ndarray, debug: bool = False ):
 	return puzzle_mask/255, puzzle_cnts
 
 
+def warp_puzzles( puzzle_contours, img_orig, debug=False):
+
+	warped_imgs = []
+	
+	for c in puzzle_contours:
+		if len(c) > 4:
+			rect = cv.minAreaRect(c)
+
+			box = cv.boxPoints(rect)
+			# box = np.int0(box)
+			center, dims, angle = rect
+			width = int(max(dims))
+		else :
+			box = c
+		dst = np.array([[0, 0],[width, 0],[width, width],[0, width]], dtype = "float32")
+		box = box.reshape((4,2))
+		M = cv.getPerspectiveTransform(box, dst)
+		warped = cv.warpPerspective(img_orig, M, (width, width))
+		warped_imgs.append(warped)
+	
+	if debug:
+		cv.namedWindow("warped", cv.WINDOW_NORMAL)
+		cv.resizeWindow("warped", 600, 400)
+		cv.imshow('warped',warped_imgs[0])
+	return warped_imgs
+
+
 def warp_puzzles_denis( puzzle_contours, img_orig ):
 	warped_imgs = []
 	
@@ -128,7 +154,6 @@ def warp_puzzles_denis( puzzle_contours, img_orig ):
 		approx = cv.approxPolyDP(c,epsilon,True)
 		if approx.shape[0] == 4:
 			box = approx.reshape(4,-1)
-		print(f'box = {box}')
 		center, dims, angle = rect
 		# dst = np.array([[0, 0],[max(dims) - 1, 0],[max(dims) - 1, max(dims) - 1],[0, maxHeight - 1]], dtype = "float32")
 		# M = cv.getPerspectiveTransform(rect, dst)
@@ -138,7 +163,7 @@ def warp_puzzles_denis( puzzle_contours, img_orig ):
 	return warped_imgs
 
 
-def warp_puzzles( puzzle_contours, img_orig):
+def warp_puzzles_old( puzzle_contours, img_orig):
 
 	warped_imgs = []
 	
@@ -153,9 +178,7 @@ def warp_puzzles( puzzle_contours, img_orig):
 		if approx.shape[0] == 4:
 			box = approx.reshape(4,-1)
 		rect = np.zeros((4, 2), dtype = "float32")
-		print(f'box = {box}')
 		s = box.sum(axis = 1)
-		print(f's = {s}')
 		rect[0] = box[np.argmin(s)]
 		rect[2] = box[np.argmax(s)]
 		diff = np.diff(box, axis = 1)
@@ -177,12 +200,12 @@ def warp_puzzles( puzzle_contours, img_orig):
 
 def find_puzzle( img, debug=False ):
 	puzzle_mask, puzzle_cnts = find_puzzle_mask(img, debug)
-	return puzzle_mask, warp_puzzles( puzzle_cnts, img)
+	return puzzle_mask, warp_puzzles_denis( puzzle_cnts, img)
 	
 	
 
 def predict_image(image: np.ndarray) -> (np.ndarray, list):
-    image = cv.cvtColor(image, cv.COLOR_BGR2GRAY)
+    # image = cv.cvtColor(image, cv.COLOR_BGR2GRAY)
     sudoku_digits = [
         np.int16([[-1, -1, -1, -1, -1, -1, -1, -1, -1],
                   [-1, -1, -1,  8,  9,  4, -1, -1, -1],
@@ -194,7 +217,8 @@ def predict_image(image: np.ndarray) -> (np.ndarray, list):
                   [-1, -1, -1,  9,  1,  3, -1, -1, -1],
                   [-1, -1, -1, -1, -1, -1, -1, -1, -1]]),
     ]
-    mask = np.bool_(np.ones_like(image))
+    puzzles_mask = find_puzzle(img)
+
 
     # loading train image:
     train_img_4 = cv.imread('/autograder/source/train/train_4.jpg', 0)
@@ -209,7 +233,7 @@ if __name__ == '__main__':
 	
 	img = cv.imread(TRAIN_IMG_NAMES[1])
 	puzzle_mask, warp_puzzles = find_puzzle(img, debug=True)
-
+	print(warp_puzzles)
 	for i, warped in enumerate(warp_puzzles):
 		cv.namedWindow(f"warped_puzze_{i}", cv.WINDOW_NORMAL)
 		cv.resizeWindow(f"warped_puzze_{i}", 600, 400)
