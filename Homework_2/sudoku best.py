@@ -22,7 +22,7 @@ PROJ_PATH = Path('/home/dendav/projects/Intro2CV_course/Homework_2')
 IMAGES_PATH = PROJ_PATH/'images'
 TRAIN_PATH = PROJ_PATH/'train'
 TRAIN_IMG_NAMES = glob.glob(str(TRAIN_PATH/'*.jpg'))
-TRAIN_IMG_NAMES.sort(key = lambda x: re.findall('\d+', x)[-1])
+TRAIN_IMG_NAMES.sort(key = lambda x: re.findall(r'\d+', x)[-1])
 WEIGHTS_PATH = '/autograder/submission/mnist_net.pt' if RELEASE else '/home/dendav/projects/Intro2CV_course/Homework_2/mnist_net.pt'
 
 LOWER_THR, UPPER_THR = (0,255)
@@ -431,7 +431,7 @@ def predict_image(image: np.ndarray, debug=False) -> (np.ndarray, list):
     return mask, sudoku_digits
 
 def empty(a):
-    pass
+        pass
 
 def find_thresh_for_digits(img):
     global LOWER_THR, UPPER_THR
