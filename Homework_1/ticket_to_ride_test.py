@@ -17,7 +17,7 @@ COLORS = ('blue', 'green', 'black', 'yellow', 'red')
 TRAINS2SCORE = {1: 1, 2: 2, 3: 4, 4: 7, 6: 15, 8: 21}
 TRAIN_CASES = {i: fname for i, fname in enumerate(('all', 'black_blue_green', 'black_red_yellow',
                                                    'red_green_blue_inaccurate', 'red_green_blue'))}
-                                                
+
 img = cv.imread(f'train/{TRAIN_CASES[2]}.jpg')
 # img = cv.cvtColor(img, cv.COLOR_BGR2RGB)
 # CITY_TEMPL = img[197:260, 622:685]
@@ -53,7 +53,6 @@ def filter_cities( centers ):
 
 
 def find_city_centers_opencv( img_gray, method=cv.TM_CCOEFF_NORMED ):
-    
     roi_win = 120
     match_centers = []
     w_templ = CITY_TEMPL.shape[1]
@@ -93,17 +92,17 @@ def find_city_centers_wo_roi_opencv(img_gray, method=cv.TM_CCOEFF_NORMED, debug=
         cv.resizeWindow("det_centers", 600, 500)
         cv.imshow('det_centers', img_det)
     return np.int64(match_centers)
- 
+
 
 def color_filter( img_bgr, color ):
     assert color in COLORS
     img = img_bgr.copy()
-    
+
     k_size = 3
     if color == 'black':
-        k_size = 3    
+        k_size = 3
     kernel = np.ones((k_size, k_size))
-    
+
     img = cv.medianBlur(img, k_size)
 
     if color == 'blue':
@@ -129,21 +128,21 @@ def color_filter( img_bgr, color ):
     else:
         img = cv.cvtColor( img, cv.COLOR_BGR2HSV)
     mask = cv.inRange( img, lower_bound, upper_bound).astype(np.uint8)
-    
+
     if color == 'blue':
         mask = cv.morphologyEx( mask, cv.MORPH_ERODE, kernel, iterations=3)
     if color == 'red':
         mask = cv.morphologyEx( mask, cv.MORPH_ERODE, kernel, iterations=2)
         mask = cv.morphologyEx( mask, cv.MORPH_CLOSE, kernel, iterations=5)
-    if color == 'green': 
+    if color == 'green':
         mask = cv.morphologyEx( mask, cv.MORPH_ERODE, kernel, iterations=5)
         mask = cv.morphologyEx( mask, cv.MORPH_CLOSE, kernel, iterations=3)
-    if color == 'black': 
+    if color == 'black':
         # to eliminate black borders
         mask = cv.morphologyEx( mask, cv.MORPH_CLOSE, kernel, iterations=2)
         mask = cv.morphologyEx( mask, cv.MORPH_OPEN, kernel, iterations=3)
         # mask = cv.morphologyEx( mask, cv.MORPH_ERODE, kernel, iterations=3)
-    
+
     return mask
 
 def make_cities_mask(centers, shape, rad=60, dtype=np.uint8 ):
@@ -154,7 +153,7 @@ def make_cities_mask(centers, shape, rad=60, dtype=np.uint8 ):
 
 
 def stick_trains( mask, color, city_centers, city_rad=60 ):
-    
+
     dilate_ksize=3
     if color == 'green':
         iterations=10
@@ -163,7 +162,7 @@ def stick_trains( mask, color, city_centers, city_rad=60 ):
         iterations=20
     else:
         iterations=15
-    
+
     dilate_kernel=np.ones((dilate_ksize,dilate_ksize))
     # sticked_trains_mask = cv.morphologyEx(mask, cv.MORPH_DILATE, dilate_kernel, iterations=iterations)
     sticked_trains_mask = cv.morphologyEx(mask, cv.MORPH_CLOSE, dilate_kernel, iterations=iterations)
@@ -174,26 +173,26 @@ def stick_trains( mask, color, city_centers, city_rad=60 ):
 
 def cvt_train_rot_angle(rect_pts, angle):
     if np.linalg.norm((rect_pts[0] - rect_pts[3])) > np.linalg.norm((rect_pts[0] - rect_pts[1])):
-        return angle 
+        return angle
     else:
         return angle -90
 
 def rotate_img( img, angle, scale=1 ):
     img_ = img.copy()
-    
+
     height, width = img_.shape[:2]
     img_center = (width/2, height/2)
-    
+
     rotate_matrix = cv.getRotationMatrix2D(center=img_center, angle=angle, scale=1)
     return cv.warpAffine(src=img_, M=rotate_matrix, dsize=(width, height))
 
 
 def find_trains_mask( img_bgr, color, match_method=cv.TM_CCOEFF_NORMED, debug=False ):
     assert color in COLORS
-    
+
     img = img_bgr.copy()
     img_gray = cv.cvtColor(img, cv.COLOR_BGR2GRAY)
-    
+
     if color == 'red':
         min_area = 700
     else:
@@ -225,7 +224,7 @@ def find_trains_mask( img_bgr, color, match_method=cv.TM_CCOEFF_NORMED, debug=Fa
     mask = color_filter(img, color)
 
     contours, hierarchy = cv.findContours(mask, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE)
-    
+
     contours = [cnt for cnt,hier in zip(contours, hierarchy[0]) if hier[3]==-1]
     filtered_contours = []
     trains_mask = np.zeros_like(mask, dtype=np.uint8)
@@ -268,7 +267,7 @@ def find_trains_mask( img_bgr, color, match_method=cv.TM_CCOEFF_NORMED, debug=Fa
         rot_angle = cvt_train_rot_angle(rect_pts, angle)
         roi_rotated = rotate_img(roi, rot_angle)
         roi_rotated2 = rotate_img(roi, -rot_angle+180)
-        
+
         match = cv.matchTemplate(roi_rotated, TRAIN_TEMPLATES_GRAY[color], method=match_method )
         _, max_val1, _, _ = cv.minMaxLoc(match)
         match_road = cv.matchTemplate(roi_rotated, BLUE_ROAD_TEMPLATE_GRAY1, method=match_method )
@@ -280,7 +279,7 @@ def find_trains_mask( img_bgr, color, match_method=cv.TM_CCOEFF_NORMED, debug=Fa
         max_val3 = max(max_val3, max_val32)
         if debug:
             print(max_val1, max_val2, max_val3)
-        
+
 
         if color == 'red':
             is_train = True
@@ -315,12 +314,12 @@ def find_trains_mask( img_bgr, color, match_method=cv.TM_CCOEFF_NORMED, debug=Fa
             if is_label:
                 img_hull = cv.putText(img_hull, '2', center, cv.FONT_HERSHEY_SIMPLEX, 1,(0,0,255), 3)
         trains_mask = cv.fillConvexPoly( trains_mask, poly, (255,255,255) );
-        
+
         # label_id = labelled[center[1], center[0]]
         # if label_id != 0:
         #     train_mask = labelled == label_id
         #     trains_mask = np.logical_or(trains_mask, train_mask )
-    
+
     if debug:
         cv.imshow('hull', img_hull)
     # trains_mask = 255 * trains_mask.astype(np.uint8)
@@ -345,12 +344,12 @@ def count_color_trains( mask, single_area=8000 ):
     count = 0
     for cnt in contours:
         area = cv.contourArea(cnt)
-        
-    
+
+
 
 def count_color_trains_and_score(mask, color, debug=False):
     max_train_len = 8
-    
+
     if color == 'blue':
         single_area = 3000
     elif color == 'black':
@@ -405,9 +404,10 @@ def count_color_trains_and_score(mask, color, debug=False):
         cv.imshow('det_n_trains', det_ntrains_img.astype(np.uint8))
     return n_trains_all, score
 
+
 def predict_image(img: np.ndarray) -> (Union[np.ndarray, list], dict, dict):
     # raise NotImplementedError
-    
+
     city_centers = find_city_centers_wo_roi_opencv(cv.cvtColor(img, cv.COLOR_BGR2GRAY))
     # city_centers = np.int64([[1000, 2000], [1500, 3000], [1204, 3251]])
     scores = {}
@@ -419,7 +419,7 @@ def predict_image(img: np.ndarray) -> (Union[np.ndarray, list], dict, dict):
         ntrains, score = count_color_trains_and_score( sticked_trains_mask, color=c )
         n_trains[c] = ntrains
         scores[c] = score
-    
+
     # n_trains = {'blue': 20, 'green': 30, 'black': 0, 'yellow': 30, 'red': 0}
     # scores = {'blue': 60, 'green': 90, 'black': 0, 'yellow': 45, 'red': 0}
     return city_centers, n_trains, scores
@@ -440,7 +440,7 @@ if __name__ == '__main__':
     det_centes_img = img.copy()
     for pt in city_centers:
         det_centes_img = cv.circle(det_centes_img, pt[::-1], 30, (255,255,255), 4)
-    
+
     blue_ntrains, blue_score = count_color_trains_and_score( sticked_trains_mask, color=color, debug=True )
     print(blue_ntrains, blue_score)
     cv.namedWindow('city_centers', cv.WINDOW_NORMAL)
@@ -450,7 +450,7 @@ if __name__ == '__main__':
     cv.namedWindow('sticked_blue_mask', cv.WINDOW_NORMAL)
     cv.resizeWindow('sticked_blue_mask', 600, 500)
     cv.imshow('sticked_blue_mask', sticked_trains_mask)
-    
+
     while True:
         key = cv.waitKey(1) & 0xFF
         if key == ord('q'):
