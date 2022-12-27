@@ -36,6 +36,7 @@ def evaluate_case(i):
     score1 = score_centers(gt_centers, centers)
     score2 = score_n_trains(gt_n_trains, n_trains)
     score3 = score_scores(gt_scores, scores)
+    print(f'find centers_score: {np.round(2.5*score1, 2)}/2.5, n_trains_score: {np.round(5*score2, 2)}/5, scores: {np.round(2.5*score3, 2)}/2.5')
     score = np.round(10 * (0.25 * score1 + 0.5 * score2 + 0.25 * score3), decimals=2)
 
     time_eval_end = time.perf_counter()

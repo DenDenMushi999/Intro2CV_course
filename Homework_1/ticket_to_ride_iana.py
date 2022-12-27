@@ -26,8 +26,8 @@ class TempMatch():
         self.w = city_template.shape[::-1][0]
         self.h = city_template.shape[::-1][1]
         self.boxes = list()
-        
-    
+
+
 
     def match(self, img):
         #template matching
@@ -50,7 +50,7 @@ class TempMatch():
         self.boxes = np.array(self.boxes)
 
         # loop over the final bounding boxes
-        
+
         for (x1, y1, x2, y2) in self.boxes:
 
             # draw the bounding box on the image
@@ -59,7 +59,7 @@ class TempMatch():
         obj_num = count
         return [self.boxes[:,1], self.boxes[:,0]], obj_num, img, self.boxes
 
-    
+
 def filter_cntrs(city_cntrs):
     thresh = 50
     filtered_centers = []
@@ -100,7 +100,7 @@ def contour_filter(contours, hierarchy, minArea):
             cnts1.append(contours[i])
     return cnts1
 
-# Detect contours 
+# Detect contours
 def contours(img, minArea):
     contours, hierarchy = cv2.findContours(img,
                                             cv2.RETR_TREE,
@@ -109,7 +109,7 @@ def contours(img, minArea):
     cnts = contour_filter(contours, hierarchy, minArea)
 
     #draw contours
-    cv2.drawContours(img, cnts, -1, (255,0,0), 3) 
+    cv2.drawContours(img, cnts, -1, (255,0,0), 3)
     cv2.imwrite('cnts.png', img)
     return cnts, hierarchy, img
 
@@ -120,7 +120,7 @@ def contours(img, minArea):
 
 def filter_green(img, k=9, g_blur=3, m_blur=11):
     image = img
-    
+
     img = cv2.GaussianBlur(img,(g_blur,g_blur),0)
     img = img[..., ::-1]
     #------------------------------------
@@ -144,8 +144,8 @@ def filter_green(img, k=9, g_blur=3, m_blur=11):
 #filter red color
 
 def filter_red(img, k=9, g_blur=3, m_blur=11):
-  
-    
+
+
     image = img
     rgb = cv2.cvtColor(image.copy(), cv2.COLOR_BGR2RGB )
     Img = cv2.GaussianBlur(image,(g_blur,g_blur),0)
@@ -156,7 +156,7 @@ def filter_red(img, k=9, g_blur=3, m_blur=11):
     LIGHT = HLS[:, :, 1]
     SAT = HLS[:, :, 2]
 
-    
+
     l_range = np.array([121, 86, 148])
     u_range = np.array([132, 148, 190])
     #red mask
@@ -172,7 +172,7 @@ def filter_red(img, k=9, g_blur=3, m_blur=11):
 #filter blue color
 
 def filter_blue(img, k=9, g_blur=3, m_blur=11):
-    
+
     image = img
     #------------------------------------
     img = cv2.GaussianBlur(img,(g_blur,g_blur),0)
@@ -189,7 +189,7 @@ def filter_blue(img, k=9, g_blur=3, m_blur=11):
     kernel = np.ones((k,k))
     mask_int_blue = cv2.morphologyEx(mask_int_blue, cv2.MORPH_CLOSE, kernel)
     mask_int_blue = cv2.medianBlur(mask_int_blue,m_blur)
-    
+
 
     return mask_int_blue
 
@@ -198,12 +198,12 @@ def filter_blue(img, k=9, g_blur=3, m_blur=11):
 #filter yellow color
 
 def filter_yellow(img, k, g_blur, m_blur):
-    
+
     img = cv2.GaussianBlur(img,(g_blur,g_blur),0)
     img = img[..., ::-1]
     #------------------------------------
     HSV = cv2.cvtColor(img, cv2.COLOR_BGR2HLS)
-   
+
 
     l_range = np.array([65, 96, 103])
     u_range = np.array([105, 157, 191])
@@ -223,13 +223,13 @@ def filter_yellow(img, k, g_blur, m_blur):
 
 def filter_black(img):
     k = 19
-   
+
     #------------------------------------
     HLS = cv2.cvtColor(img, cv2.COLOR_RGB2HLS)
-    HUE = HLS[:, :, 0]             
+    HUE = HLS[:, :, 0]
     LIGHT = HLS[:, :, 1]
     SAT = HLS[:, :, 2]
-    
+
     mask_black = (LIGHT < 25)
     mask_int_black = mask_black.astype(np.uint8)
     kernel = np.ones((15,15))
@@ -291,7 +291,7 @@ def count_trains(area, one_size):
          score += 15
       else:
          score += 21
-  
+
 
    return n_train, score
 
@@ -313,7 +313,7 @@ def count_green(img, img_green_tmp):
 
 
 def remove_tracks(img, template, cnts):
-    
+
     match = TempMatch(template)
     result_match = match.match(img)
     img = result_match[2]
@@ -325,7 +325,7 @@ def remove_tracks(img, template, cnts):
         center_x = coord[1][i] + 0.5*match.w
         center_y = coord[0][i] + 0.5*match.h
         center_coord.append((center_x, center_y))
-        
+
     hull_list = []
 
     for i in range(len(cnts)):
@@ -340,7 +340,7 @@ def remove_tracks(img, template, cnts):
             if result == 1.0 or result==0.0:
                 id.append(j)
 
-    id_sort = sorted(id, reverse=True)  
+    id_sort = sorted(id, reverse=True)
     # print(id_sort)
     id_sort = dict.fromkeys(id_sort)
     for i in id_sort:
@@ -361,7 +361,7 @@ def count_blue(img, img_blue_tmp):
         return 0, 0
     else:
         return count_trains(blue_area, blue_size)
-    
+
 
 
 
@@ -387,7 +387,7 @@ def count_yellow(img, img_yellow_tmp):
 def count_red(img, img_red_tmp):
     n_red = 0
     # COntours for red trains
-    
+
     red_cnts = contours(filter_red(img, k=23, g_blur=1, m_blur=27), 1000)
     #red__size = size_of_track(img_red_tmp, filter_red(img_red_tmp, k=23, g_blur=1, m_blur=27), 1000)
     red_size = 5000
@@ -410,7 +410,7 @@ def count_black(img, img_black_tmp):
     # print(black_area)
     #black__size = size_of_track(img_black_tmp, filter_black(img_black_tmp), 500)
     black_size = 6500
-  
+
     if not black_area:
         return 0, 0
     else:
@@ -420,7 +420,7 @@ def count_black(img, img_black_tmp):
 
 
 
-def predict_image(img): 
+def predict_image(img):
     city_cntrs = city_coord(img)
     city_center = filter_cntrs(city_cntrs)
 
@@ -435,13 +435,13 @@ def predict_image(img):
     n_yellow, score_yellow = count_yellow(img, img_yellow_tmp)
     n_red, score_red = count_red(img, img_red_tmp)
     n_black, score_black = count_black(img, img_black_tmp)
-    
+
     n_trains = {'blue': n_blue, 'green': n_green, 'black': n_black, 'yellow': n_yellow, 'red': n_red}
     scores = {'blue': score_blue, 'green': score_green, 'black': score_black, 'yellow': score_yellow, 'red':score_red}
     city_center = np.int64(city_center)
 
     return city_center, n_trains, scores
-    
+
 
 
 
