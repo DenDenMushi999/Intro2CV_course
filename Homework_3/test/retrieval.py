@@ -1,3 +1,6 @@
+import json
+from typing import List
+
 import cv2 as cv
 import numpy as np
 
@@ -5,16 +8,13 @@ import numpy as np
 # from product_detector import FeatureMatcher, ProductDetectorOnFeatures
 # from product_detector import TRAIN_IMAGES, TEMPLATE_IMAGES
 
-TEMPLATE_FNAME_PREFIXES = ['0_0', '0_1', '1', '2', '3']
+TEMPLATE_FNAME_PREFIXES = ['0_0', '0_1', '1', '2', '3', 'extreme']
 TRAIN_FNAME_PREFIXES = ['0', '1', '2', '3', 'extreme']
 
-TEMPLATE_IMAGES = [cv.imread(f'train/template_{prefx}.jpg') for prefx in TEMPLATE_FNAME_PREFIXES]
-TRAIN_IMAGES = [cv.imread(f'train/train_{prefx}.jpg') for prefx in TRAIN_FNAME_PREFIXES]
+PATH = '/home/dendav/projects/Intro2CV_course/Homework_3'
+TEMPLATE_IMAGES = [cv.imread(f'{PATH}/train/template_{prefx}.jpg') for prefx in TEMPLATE_FNAME_PREFIXES]
+TRAIN_IMAGES = [cv.imread(f'{PATH}/train/train_{prefx}.jpg') for prefx in TRAIN_FNAME_PREFIXES]
 
-import json
-from typing import List
-
-import cv2 as cv
 def empty(a):
     pass
 
@@ -66,10 +66,10 @@ def CalibrateParametersGUI( cls, init_params: List, func_name, var_names, var_co
 
         getattr(instance, func_name)(*args, **kwargs)
 
-    print(f'Final values of {cls.__name__}.{func_name}():')
+    # print(f'Final values of {cls.__name__}.{func_name}():')
     for var_name in var_names:
-        print(f'{var_name}: {getattr(instance, var_name)}')
-
+        # print(f'{var_name}: {getattr(instance, var_name)}')
+        pass
 
 def remove_object_from_img(img, bbox, scaled=False):
     if scaled:
@@ -143,7 +143,7 @@ class ROIHandler:
         if self.cur_roi_num != 0 and  not self.is_end:
             new_bbox = list(self.roi.bbox)
             if self.is_x_end:
-                print('roi_handler: end of x')
+                # print('roi_handler: end of x')
                 new_bbox[0] = 0
                 new_bbox[1] += self.stride_y
             else:
@@ -240,7 +240,7 @@ class ProductDetectorOnFeatures:
         self.roi_handler = ROIHandler(img, self.w_roi, self.h_roi, self.stride_x, self.stride_y, int(query.shape[1]/3), int(query.shape[0]/3) )
 
         self.drect_ratio = 0.2
-        self.dims_ratio = 0.2
+        self.dims_ratio = 0.3
         self.found_obj_dims = None
         # w/h
         self.query_rect_ratio = self.query.shape[1]/self.query.shape[0]
@@ -269,19 +269,21 @@ class ProductDetectorOnFeatures:
     def verify_bbox(self, bbox):
         if not bbox:
             return False
-        print(f'self.found_obj_dims: {self.found_obj_dims}')
-        print(f'bbox: {bbox}')
+        # print(f'self.found_obj_dims: {self.found_obj_dims}')
+        # print(f'bbox: {bbox}')
         rect_ratio = np.abs(bbox[2]/bbox[3] - self.query_rect_ratio)/self.query_rect_ratio
         is_ok = rect_ratio < self.drect_ratio
         if not is_ok:
-            print(f'object bbox has bad rect dimensions ratio!: {rect_ratio}')
+            # print(f'object bbox has bad rect dimensions ratio!: {rect_ratio}')
+            pass
         is_ok = True
         if self.found_obj_dims:
             dimx_ratio = np.abs(bbox[2]-self.found_obj_dims[0])/self.found_obj_dims[0]
             dimy_ratio = np.abs(bbox[3]-self.found_obj_dims[1])/self.found_obj_dims[1]
             is_ok = is_ok and  dimx_ratio < self.dims_ratio and dimy_ratio < self.dims_ratio
             if not is_ok:
-                print(f'object bbox has bad dimensions: {dimx_ratio}, {dimy_ratio}')
+                # print(f'object bbox has bad dimensions: {dimx_ratio}, {dimy_ratio}')
+                pass
         return is_ok
 
     def detect_strongest_object(self, filtered_matches, kp_src, kp_dst ,query_shape, img_shape, debug=False):
@@ -299,14 +301,17 @@ class ProductDetectorOnFeatures:
             # -    -
             # 1 -- 2
             pts = np.float32([ [0,0],[0,h_query-1],[w_query-1,h_query-1],[w_query-1,0] ]).reshape(-1,1,2)
-            dst = cv.perspectiveTransform(pts,Homography)
-            print(f'dst: {dst}')
+            try:
+                dst = cv.perspectiveTransform(pts,Homography)
+            except:
+                return []
+            # print(f'dst: {dst}')
 
             # x_min, y_min, w, h = bbox
             bbox = list(cv.boundingRect(dst))
-            print("found object!")
+            # print("found object!")
         else:
-            print("Not enough matches to find object")
+            # print("Not enough matches to find object")
             return []
         return tuple(bbox)
 
@@ -338,10 +343,9 @@ class ProductDetectorOnFeatures:
             bboxes_list.append(obj_bbox)
             self.found_obj_dims = obj_bbox[2:]
             if debug:
-                print(self.scale_bbox(obj_bbox))
+                # print(self.scale_bbox(obj_bbox))
                 cv.imshow('current_img',self.roi_handler.img)
-                cv.waitKey(100)
-        print('scanned all image once')
+        # print('scanned all image once')
         return bboxes_list, self.roi_handler.img
 
     def remove_outliers(self, bboxes_list):
@@ -357,7 +361,24 @@ class ProductDetectorOnFeatures:
             index += 1
         filtered_bboxes = filtered_bboxes.tolist()
         filtered_bboxes = list(map(tuple, filtered_bboxes))
+
+        filtered_bboxes = list(filter(self.is_bbox_outside, filtered_bboxes))
+
         return filtered_bboxes
+
+    def is_bbox_outside(self, bbox):
+        # scaled bboxe
+        x_min = bbox[0]
+        y_min = bbox[1]
+        x_max = bbox[0]+bbox[2]
+        y_max = bbox[1]+bbox[3]
+
+        if  x_min < -bbox[2]*2/3 \
+            or y_min < -bbox[3]*2/3 \
+            or (x_max - 1) > bbox[2]*2/3 \
+            or (y_max - 1) > bbox[3]*2/3:
+            return False
+        return True
 
     def detect_all_objects(self, debug=False):
         bboxes_list = []
@@ -377,7 +398,7 @@ class ProductDetectorOnFeatures:
 
         bboxes_list = self.remove_outliers(bboxes_list)
         if not bboxes_list:
-            return
+            bboxes_list = [(0,0,1,1)]
         if debug:
             imshow('img_wo_objects', self.roi_handler.img)
         print(f'Found all objects: {len(bboxes_list)} count')
@@ -391,14 +412,15 @@ def predict_image(img: np.ndarray, query: np.ndarray) -> list:
     product_detector = ProductDetectorOnFeatures(img, query)
     bboxes_list = product_detector.detect_all_objects()
     if not bboxes_list:
-        return [(0, 0, 1, 1), ]
+        return [(0, 0, 1, 1)]
+    return bboxes_list
 
 if __name__ == '__main__':
 
-    debug=False
+    debug=True
 
-    img = TRAIN_IMAGES[0]
-    query = TEMPLATE_IMAGES[0]
+    img = TRAIN_IMAGES[2]
+    query = TEMPLATE_IMAGES[3]
     # img = cv.cvtColor(img, cv.COLOR_BGR2GRAY)
     # query = cv.cvtColor(query, cv.COLOR_BGR2GRAY)
 
@@ -422,11 +444,11 @@ if __name__ == '__main__':
     # CalibrateParametersGUI( FeatureMatcher, init_params, func_name, var_names, var_coeffs, max_var_vals, matches, debug=True, img=img, kp_img=kp_img, query=query, kp_query=kp_query )
 
     product_detector = ProductDetectorOnFeatures(img, query)
-    product_detector.detect_all_objects(debug=debug)
+    bboxes = product_detector.detect_all_objects(debug=debug)
     # product_detector.detect_objects_old(img, query, debug=debug)
 
     while True:
-        key = cv.waitKey(1) & 0xFF
+        key = cv.waitKey(100) & 0xFF
         if key == ord('q'):
             break
     cv.destroyAllWindows()

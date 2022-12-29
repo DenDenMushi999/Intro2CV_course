@@ -6,11 +6,11 @@ from utils import CalibrateParametersGUI, imshow, create_win
 from roi_utils import ROI, ROIHandler, remove_object_from_img
 from feature_matcher import FeatureMatcher
 
-# TEMPLATE_FNAME_PREFIXES = ['0_0', '0_1', '1', '2', '3']
-# TRAIN_FNAME_PREFIXES = ['0', '1', '2', '3', 'extreme']
+TEMPLATE_FNAME_PREFIXES = ['0_0', '0_1', '1', '2', '3']
+TRAIN_FNAME_PREFIXES = ['0', '1', '2', '3', 'extreme']
 
-# TEMPLATE_IMAGES = [cv.imread(f'train/template_{prefx}.jpg') for prefx in TEMPLATE_FNAME_PREFIXES]
-# TRAIN_IMAGES = [cv.imread(f'train/train_{prefx}.jpg') for prefx in TRAIN_FNAME_PREFIXES]
+TEMPLATE_IMAGES = [cv.imread(f'train/template_{prefx}.jpg') for prefx in TEMPLATE_FNAME_PREFIXES]
+TRAIN_IMAGES = [cv.imread(f'train/train_{prefx}.jpg') for prefx in TRAIN_FNAME_PREFIXES]
 
 
 class ProductDetectorOnFeatures:
@@ -143,8 +143,6 @@ class ProductDetectorOnFeatures:
                                                               np.abs(filtered_bboxes[:,1] - bbox[1]) > self.obj_min_y_dist)]
             filtered_bboxes = np.insert(filtered_bboxes, index, bbox, axis=0)
             index += 1
-        filtered_bboxes = filtered_bboxes.tolist()
-        filtered_bboxes = list(map(tuple, filtered_bboxes))
         return filtered_bboxes
 
     def detect_all_objects(self, debug=False):
@@ -164,46 +162,45 @@ class ProductDetectorOnFeatures:
         bboxes_list.extend(bboxes_list_one_iter)
 
         bboxes_list = self.remove_outliers(bboxes_list)
-        if not bboxes_list:
-            return
+
         if debug:
             imshow('img_wo_objects', self.roi_handler.img)
         print(f'Found all objects: {len(bboxes_list)} count')
         print(bboxes_list)
         return bboxes_list
 
-    # def detect_objects_old(self, img, query, debug=False):
-    #     bboxes_list = []
+    def detect_objects_old(self, img, query, debug=False):
+        bboxes_list = []
 
-    #     if debug:
-    #         create_win('current_img')
-    #     obj_bbox = []
-    #     while True:
-    #         obj_bbox = []
+        if debug:
+            create_win('current_img')
+        obj_bbox = []
+        while True:
+            obj_bbox = []
 
-    #         kp_img, descr_img = self.detector.detectAndCompute(img, mask=None)
-    #         kp_query, descr_query = self.detector.detectAndCompute(query, mask=None)
+            kp_img, descr_img = self.detector.detectAndCompute(img, mask=None)
+            kp_query, descr_query = self.detector.detectAndCompute(query, mask=None)
 
-    #         matches = self.matcher.match(descr_query, descr_img, debug, img, kp_img, query, kp_query)
-    #         filtered_matches, matches_mask = self.matcher.filter_matches(matches, debug, img, kp_img, query, kp_query)
+            matches = self.matcher.match(descr_query, descr_img, debug, img, kp_img, query, kp_query)
+            filtered_matches, matches_mask = self.matcher.filter_matches(matches, debug, img, kp_img, query, kp_query)
 
-    #         obj_bbox = self.detect_strongest_object(filtered_matches, kp_query, kp_img, query.shape[:2], img.shape[:2], debug=debug)
-    #         print(self.scale_bbox(obj_bbox))
+            obj_bbox = self.detect_strongest_object(filtered_matches, kp_query, kp_img, query.shape[:2], img.shape[:2], debug=debug)
+            print(self.scale_bbox(obj_bbox))
 
-    #         if not self.verify_bbox(obj_bbox):
-    #             break
+            if not self.verify_bbox(obj_bbox):
+                break
 
-    #         img = self.remove_object_from_img(img, obj_bbox)
+            img = self.remove_object_from_img(img, obj_bbox)
 
-    #         # self.verify_bbox(obj_bbox)
+            # self.verify_bbox(obj_bbox)
 
-    #         obj_bbox = self.scale_bbox(obj_bbox)
-    #         self.found_obj_dims = obj_bbox[2:]
-    #         bboxes_list.append(obj_bbox)
-    #         if debug:
-    #             cv.imshow('current_img',img)
-    #     print('Found all objects')
-    #     return bboxes_list
+            obj_bbox = self.scale_bbox(obj_bbox)
+            self.found_obj_dims = obj_bbox[2:]
+            bboxes_list.append(obj_bbox)
+            if debug:
+                cv.imshow('current_img',img)
+        print('Found all objects')
+        return bboxes_list
 
 
 
