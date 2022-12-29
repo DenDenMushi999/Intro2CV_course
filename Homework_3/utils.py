@@ -9,7 +9,17 @@ def load_json(path):
     with open(path, 'r') as f:
         return json.load(f)
 
+def imshow(win_name, img):
+    cv.namedWindow(win_name, cv.WINDOW_NORMAL)
+    cv.resizeWindow(win_name, 800, 600)
+    cv.imshow(win_name, img)
+
+def create_win(win_name):
+    cv.namedWindow(win_name, cv.WINDOW_NORMAL)
+    cv.resizeWindow(win_name, 800, 600)
+
 def CalibrateParametersGUI( cls, init_params: List, func_name, var_names, var_coeffs, max_var_vals, *args, **kwargs ):
+    # print(args, kwargs)
     instance = cls(*init_params)
     win_name = f'tune_{cls.__name__}.{func_name}'
     cv.namedWindow(win_name)

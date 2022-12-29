@@ -91,7 +91,6 @@ class CityDetector:
         return np.int64(match_centers)
 
     def remove_outliers(self, centers):
-
         centers = np.array(centers)
         filtered_centers = centers.copy()
         index = 0
@@ -103,41 +102,75 @@ class CityDetector:
         return filtered_centers
 
 class ColorFilter():
-    def __init__(self, color):
+    def __init__(self, color, k_size=3):
         self.colors = COLORS
         self.color = color
 
-        self.k_size = 3
-        if color == 'black':
-            self.k_size = 3
-        self.kernel = np.ones((self.k_size, self.k_size))
+        self.set_k_size(k_size)
 
         if color == 'blue':
-            self.lower_bound = (90, 159, 90)
-            self.upper_bound = (112, 255, 180)
+            self.l_H = 90; self.u_H = 112
+            self.l_S = 159; self.u_S = 255
+            self.l_V = 90; self.u_V = 180
         if color == 'red':
-            self.lower_bound = (140, 160, 70)
-            self.upper_bound = (180, 255, 255)
+            self.l_H = 140; self.u_H = 180
+            self.l_S = 160; self.u_S = 255
+            self.l_V = 70; self.u_V = 255
             # self.lower_bound2 = (0, 180, 84)
             # self.upper_bound2 = (30, 255, 255)
         if color == 'green':
-            self.lower_bound = (32, 111, 32)
-            self.upper_bound = (90, 255, 255)
+            self.l_H = 32; self.u_H = 90
+            self.l_S = 111; self.u_S = 255
+            self.l_V = 32; self.u_V = 255
         if color == 'black':
-            self.lower_bound = np.array([0, 0, 0])
-            self.upper_bound = np.array([180, 255, 30])
+            self.l_H = 0; self.u_H = 180
+            self.l_S = 0; self.u_S = 255
+            self.l_V = 0; self.u_V = 30
         if color == 'yellow':
-            self.lower_bound = np.array([15, 59, 110])
-            self.upper_bound = np.array([40, 255, 255])
+            self.l_H = 15; self.u_H = 40
+            self.l_S = 39; self.u_S = 255
+            self.l_V = 110; self.u_V = 255
+        self.lower_bound = (self.l_H, self.l_S, self.l_V)
+        self.upper_bound = (self.u_H, self.u_S, self.u_V)
 
-    def color_filter(self, img):
-        img = cv.medianBlur(img, self.k_size)
+    def update_bounds(self):
+        self.lower_bound = (self.l_H, self.l_S, self.l_V)
+        self.upper_bound = (self.u_H, self.u_S, self.u_V)
+
+    def set_l_H(self,val):
+        self.l_H = val
+        self.update_bounds()
+    def set_u_H(self,val):
+        self.u_H = val
+        self.update_bounds()
+    def set_l_S(self,val):
+        self.l_S = val
+        self.update_bounds()
+    def set_u_S(self,val):
+        self.u_S = val
+        self.update_bounds()
+    def set_l_V(self,val):
+        self.l_V = val
+        self.update_bounds()
+    def set_u_V(self,val):
+        self.u_V = val
+        self.update_bounds()
+
+    def set_k_size(self, k_size):
+        k_size = int(k_size)
+        self.k_size = k_size + (1-k_size%2)
+        if self.color == 'black':
+            self.k_size = 3
+        self.kernel = np.ones((self.k_size, self.k_size))
+
+    def color_filter(self, img, debug=False):
+        img_proc = cv.medianBlur(img, self.k_size)
 
         if self.color == 'yellow':
-            img = cv.cvtColor( img, cv.COLOR_BGR2HLS)
+            img_proc = cv.cvtColor( img_proc, cv.COLOR_BGR2HLS)
         else:
-            img = cv.cvtColor( img, cv.COLOR_BGR2HSV)
-        mask = cv.inRange( img, self.lower_bound, self.upper_bound).astype(np.uint8)
+            img_proc = cv.cvtColor( img_proc, cv.COLOR_BGR2HSV)
+        mask = cv.inRange( img_proc, self.lower_bound, self.upper_bound).astype(np.uint8)
 
         if self.color == 'blue':
             mask = cv.morphologyEx( mask, cv.MORPH_ERODE, self.kernel, iterations=3)
@@ -153,6 +186,14 @@ class ColorFilter():
             mask = cv.morphologyEx( mask, cv.MORPH_OPEN, self.kernel, iterations=3)
             # mask = cv.morphologyEx( mask, cv.MORPH_ERODE, self.kernel, iterations=3)
 
+        if debug:
+            cv.namedWindow('orig_image_in_color_filter', cv.WINDOW_NORMAL)
+            cv.resizeWindow("orig_image_in_color_filter", 800, 600)
+            cv.imshow('orig_image_in_color_filter', img)
+
+            cv.namedWindow('color_filter_mask', cv.WINDOW_NORMAL)
+            cv.resizeWindow("color_filter_mask", 800, 600)
+            cv.imshow('color_filter_mask', (mask * 30).astype(np.uint8))
         return mask
 
 
@@ -169,8 +210,8 @@ class TrainDetector:
             self.min_area = 1500
         self.min_width = 80
         self.min_height = 15
-        self.k_size = 3
-        self.kernel = np.ones((self.k_size, self.k_size))
+
+        self.set_k_size(3)
         self.roi_win = 80
 
         self.match_thresh = 0.4
@@ -191,6 +232,11 @@ class TrainDetector:
         self.bg_frame_size = 80
         assert self.bg_frame_size >= self.roi_win
 
+    def set_k_size(self, k_size):
+        k_size = int(k_size)
+        self.k_size = k_size + (1 - k_size%2)
+        self.kernel = np.ones((self.k_size, self.k_size))
+
     def convert_train_rot_angle(self, rect_pts, angle):
         if np.linalg.norm((rect_pts[0] - rect_pts[3])) > np.linalg.norm((rect_pts[0] - rect_pts[1])):
             return angle
@@ -206,7 +252,7 @@ class TrainDetector:
         rotate_matrix = cv.getRotationMatrix2D(center=img_center, angle=angle, scale=1)
         return cv.warpAffine(src=img_, M=rotate_matrix, dsize=(width, height))
 
-    def find_one_color_trains_mask(self, img_bgr, color, match_method=cv.TM_CCOEFF_NORMED, debug=False):
+    def find_one_color_trains_mask(self, img_bgr, match_method=cv.TM_CCOEFF_NORMED, debug=False):
         img = img_bgr.copy()
         img_gray = cv.cvtColor(img, cv.COLOR_BGR2GRAY)
 
@@ -257,20 +303,20 @@ class TrainDetector:
             roi_rotated = self.rotate_img(roi, rot_angle)
             roi_rotated2 = self.rotate_img(roi, -rot_angle+180)
 
-            match = cv.matchTemplate(roi_rotated, TRAIN_TEMPLATES_GRAY[color], method=match_method )
+            match = cv.matchTemplate(roi_rotated, TRAIN_TEMPLATES_GRAY[self.color], method=match_method )
             _, max_val1, _, _ = cv.minMaxLoc(match)
             match_road = cv.matchTemplate(roi_rotated, BLUE_ROAD_TEMPLATE_GRAY1, method=match_method )
             _, max_val2, _, _ = cv.minMaxLoc(match_road)
-            match_label = cv.matchTemplate(roi_rotated, LABEL_TEMPLATES_GRAY[color], method=match_method )
-            match_label2 =  cv.matchTemplate(roi_rotated2, LABEL_TEMPLATES_GRAY[color], method=match_method )
+            match_label = cv.matchTemplate(roi_rotated, LABEL_TEMPLATES_GRAY[self.color], method=match_method )
+            match_label2 =  cv.matchTemplate(roi_rotated2, LABEL_TEMPLATES_GRAY[self.color], method=match_method )
             _, max_val3, _, _ = cv.minMaxLoc(match_label)
             _, max_val32, _, _ = cv.minMaxLoc(match_label2)
             max_val3 = max(max_val3, max_val32)
             if debug:
-                print(max_val1, max_val2, max_val3)
+                print(f'max_val1:{max_val1}, max_val2:{max_val2}, max_val3:{max_val3}')
 
 
-            if color == 'red':
+            if self.color == 'red':
                 is_train = True
             else:
                 is_train = max_val1 > self.match_thresh

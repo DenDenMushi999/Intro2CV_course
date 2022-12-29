@@ -6,7 +6,7 @@ import cv2 as cv
 from skimage.filters import gaussian
 from skimage.measure import label
 
-from cv_utils import CityDetector, TicketToRideHandler
+from cv_utils import CityDetector, ColorFilter, TrainDetector, TicketToRideHandler
 from utils import CalibrateParametersGUI
 
 COLORS = ('blue', 'green', 'black', 'yellow', 'red')
@@ -39,7 +39,26 @@ if __name__ == '__main__':
 
     city_centers = task_handler.find_city_centers_wo_roi_opencv(img_gray, debug=debug)
 
-    # train_centers, trains_mask = task_handler.find_one_color_trains_mask(img, color=color, debug=debug)
+    var_names = ['k_size','l_H', 'u_H', 'l_S', 'u_S', 'l_V', 'u_V']
+    var_coeffs = [1,1,1,1,1,1,1]
+    max_var_vals = [30, 180, 180, 255, 255, 255, 255]
+    for case in TRAIN_CASES.values():
+        img_path = f'train/{case}.jpg'
+        print(img_path)
+        img = cv.imread(img_path)
+        CalibrateParametersGUI(ColorFilter, [color], 'color_filter', var_names, var_coeffs, max_var_vals, img, debug=debug)
+
+    # var_names = ['min_area', 'k_size']
+    # var_coeffs = [1,1]
+    # max_var_vals = [3000, 20]
+    # for case in TRAIN_CASES.values():
+    #     img_path = f'train/{case}.jpg'
+    #     print(img_path)
+    #     img = cv.imread(img_path)
+    #     CalibrateParametersGUI(TrainDetector, [color], 'find_one_color_trains_mask', var_names, var_coeffs, max_var_vals, img, debug=debug)
+
+    train_centers, trains_mask = task_handler.find_one_color_trains_mask(img, color=color, debug=debug)
+
     # sticked_trains_mask = task_handler.stick_trains(trains_mask, color, city_centers, 60)
     # print(city_centers)
 
